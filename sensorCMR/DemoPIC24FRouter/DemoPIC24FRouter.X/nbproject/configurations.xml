@@ -30,6 +30,7 @@
         <itemPath>../../Microchip/ZigBeeStack/zSecurity.h</itemPath>
         <itemPath>../../Microchip/ZigBeeStack/zSecurity_MRF24J40.h</itemPath>
         <itemPath>../../Microchip/ZigBeeStack/zTest.h</itemPath>
+        <itemPath>../../Microchip/Common/i2c_t.h</itemPath>
       </logicalFolder>
       <itemPath>../../Microchip/Common/generic.h</itemPath>
       <itemPath>../../Microchip/Common/Compiler.h</itemPath>
@@ -62,6 +63,7 @@
         <itemPath>../../Microchip/ZigBeeStack/zPHY_MRF24J40.c</itemPath>
         <itemPath>../../Microchip/ZigBeeStack/zSecurity_MRF24J40.c</itemPath>
         <itemPath>../myZigBee.c</itemPath>
+        <itemPath>../../Microchip/Common/i2c_t.c</itemPath>
       </logicalFolder>
       <itemPath>../Router.c</itemPath>
     </logicalFolder>
@@ -76,9 +78,8 @@
     </logicalFolder>
   </logicalFolder>
   <sourceRootList>
-    <Elem>../</Elem>
     <Elem>C:/Program Files (x86)/Microchip/MPLAB C30/support/PIC24F/h</Elem>
-    <Elem>../../Microchip/Common</Elem>
+    <Elem>../../..</Elem>
   </sourceRootList>
   <projectmakefile>Makefile</projectmakefile>
   <confs>

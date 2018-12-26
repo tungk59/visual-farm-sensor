@@ -363,7 +363,7 @@ void MACEnable (void)
 void MACInit(void)
 {
     BYTE i;
-
+    
     TxHeader = TX_HEADER_START;
     TxData = TX_DATA_START;
 
@@ -372,10 +372,10 @@ void MACInit(void)
     {
         macIndirectBuffers[i].buffer = NULL;
     }
-
+    
     params.MLME_RESET_request.SetDefaultPIB = TRUE;
+    
     MACTasks(MLME_RESET_request);
-
     macTasksPending.Val = 0;
     currentPacket.info.Val = 0;
 

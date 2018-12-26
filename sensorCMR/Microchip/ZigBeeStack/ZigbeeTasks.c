@@ -87,7 +87,7 @@ void ZigBeeInit(void)
 	#if !defined(__C30__)
     	SRAMInitHeap();
 	#endif
-
+//    printf("0!!");
     #ifdef USE_EXTERNAL_NVM
         NVMInit();
     #endif
@@ -98,7 +98,6 @@ void ZigBeeInit(void)
 	#if defined(AODV_ORIGINAL)
     ZDOInit();				 
 	#endif
-
     TxHeader = 127;
     TxData = 0;
     RxWrite = 0;

@@ -36,9 +36,8 @@
 #include "zPHY_MRF24J40.h"
 #include "math.h"
 #include "stdlib.h"
-//#if
-//
-//#endif
+
+#include "i2c_t.h"
 #ifdef I_SUPPORT_SECURITY
     #include "zSecurity.h"
 #endif
@@ -48,6 +47,10 @@
     #include "console.h"
 #endif
 
+#if defined(USE_Max44009)
+    #include "i2c_t.h"
+    #include "delay.h"
+#endif
 // If you are going to use SHT module, include this file.
 #if defined(USE_SHT10)
     #include "delay.h"
@@ -185,8 +188,16 @@ void SendOneByte(BYTE data, WORD ClusterID);
 void SendByte(BYTE data, WORD ClusterID, BYTE MSB, BYTE LSB);
 //Retask
 void AnalyzeStatus(BYTE status);//tach ban tin retask cho cac chuc nang
+void Remote_relay(BYTE cmd);
+BYTE relay_Status=0;
 BYTE AggregateStatus();//tong hop chuc nang de gui ve bo
 
+#if defined(USE_Max44009)
+    //get value Max44009
+    void Send_Max_ToRouterEmboard(WORD MAX_Cluster);
+    void getMax44009(void);
+
+#endif
 #if defined(USE_SHT10)
     //Node mang gan sensor SHT su dung ham nay de gui du lieu ve Router-EMB
     void Send_HTE_ToRouterEmboard(WORD HTE_Cluster);
@@ -283,6 +294,13 @@ extern NWK_STATUS nwkStatus;
 #else
     BYTE SHT_STATUS = 0;
 #endif
+#if defined(USE_Max44009)
+    WORD valueMax44009;
+    BYTE MAX44009_STATUS = 1;
+#else
+    BYTE MAX44009_STATUS = 0;
+#endif    
+    
 #if defined(USE_PTC06)
    WORD length_data;
    BYTE buffer[4000];
@@ -517,6 +535,7 @@ int main(void)
     #if defined(USE_DEBUG) || defined(USE_CONTROL_PUMP) || defined(USE_CONTROL_ALARM)
 	ConsoleInit();
         UART1Init();
+                
     #endif
 
     // Initialize module UART1 to communicate with Miniradar sensor.
@@ -534,6 +553,15 @@ int main(void)
     // Initialize the hardware - must be done before initializing ZigBee.
     HardwareInit();
     
+    // configure for I2C nxt
+#if defined(USE_Max44009)
+    I2C1_Enable();
+    BYTE xx=I2C1_iWrite8(0x4A,0x02,0x40);
+//    //ntf("%d",xx);pri
+//    printf("test I2c: "); UART1PrintChar(xx);
+//    DelayMs(200);
+    
+#endif
     #if defined(USE_DEBUG)
         printf("Init Hardware\r\n");
     #endif
@@ -616,7 +644,6 @@ int main(void)
     #endif
     /* Clearing nwk status flags */
     nwkStatus.flags.Val = 0x00;
-  
     while (1)
     {
         /* Clear the watch dog timer */
@@ -1204,6 +1231,19 @@ SubmitJoinRequest:
                                 SendByte(AggregateStatus(), STATUS_RESPONSE, MSB, LSB);
                             }
                             break;
+                            
+                            case RELAY_FUNCTION:
+                            {//15/11/2016:
+                                BYTE MSB,LSB;
+                                WORD Addr = params.APSDE_DATA_indication.SrcAddress.ShortAddr.Val;
+                                MSB = (Addr >> 8) & 0xff;
+                                LSB = Addr & 0xff;
+                                Remote_relay(APLGet());
+                                //kiem tra trang thai
+//                                SendOneByte(AggregateStatus(), STATUS_RESPONSE);
+                                //SendByte(relay_Status, RELAY_RESPONSE, MSB, LSB);
+                            }
+                            break;
 
                             //user clusterID application
                             #ifdef USE_SAVE_ENERGY_MODE
@@ -1288,7 +1328,7 @@ SubmitJoinRequest:
                                     #endif
                                 }
                                     break;
-
+                                    
                                 case RE_CONFIG_CYCLE_CLUSTER:
                                 {
                                     data = APLGet();
@@ -1323,16 +1363,37 @@ SubmitJoinRequest:
                             }break;
                             #endif
 
+                            /****************lenh lay anh sang ************************/
+                                            /*nxt*/
+                            #if defined(USE_Max44009)
+
+                            case MAX_REQUEST_CLUSTER:
+                            {//15/11/2016:
+                                BYTE MS,LS;
+                                WORD Addr = params.APSDE_DATA_indication.SrcAddress.ShortAddr.Val;
+                                MS = (Addr >> 8) & 0xff;
+                                LS = Addr & 0xff;
+                                APLGet();
+                                if(MAX44009_STATUS)
+                                {
+                                    getMax44009();
+                                    Send_Max_ToRouterEmboard(MAX_RESPONSE_CLUSTER);
+                                }else
+//                                    SendOneByte(AggregateStatus(), NONE_SUPPORT);
+                                    SendByte(AggregateStatus(), NONE_SUPPORT, MS, LS);
+                            }break;
+                            #endif                     
+
                             #if defined(USE_MQ6_V1)
                                 case RE_ASSIGN_LEVEL_MQ6_CLUSTER:
                                 {
                                     data = APLGet();
                                     ThresholdMQ6 = Threshold_0 + data * STEP_OF_THRES;
-                                    #ifdef USE_DEBUG
-                                        printf("MQ6_LEVEL = ");
-                                        PrintWord(ThresholdMQ6);
-                                        printf("\r\n");
-                                    #endif
+//                                    #ifdef USE_DEBUG
+//                                        printf("MQ6_LEVEL = ");
+//                                        PrintWord(ThresholdMQ6);
+//                                        printf("\r\n");
+//                                    #endif
                                 }
                                 break;
 
@@ -1752,14 +1813,14 @@ void ProcessNONZigBeeTasks(void)
     {
         #if defined(USE_DEBUG)
             /* Hien thi ket qua tu cam bien khoi */
-            printf("MQ6 signal (hex): ");
-            PrintWord(Mq6Signal);
-            printf("\r\n");
-
-            /* Hien thi ket qua do dien ap nguon */
-            printf("Voltage (hex): ");
-            PrintWord(Energy_Level);
-            printf("\r\n");
+//            printf("MQ6 signal (hex): ");
+//            PrintWord(Mq6Signal);
+//            printf("\r\n");
+//
+//            /* Hien thi ket qua do dien ap nguon */
+//            printf("Voltage (hex): ");
+//            PrintWord(Energy_Level);
+//            printf("\r\n");
         #endif
 
         if(WSANFlags.bits.DisableGetThresMq6 == 0)
@@ -1769,9 +1830,9 @@ void ProcessNONZigBeeTasks(void)
                 Threshold_0 = Mq6Signal + 150;//lay nguong canh bao chay co ban.
                 ThresholdMQ6 = Threshold_0;//gia tri nguong nay thay doi duoc dua tren gia tri nguong co ban.
                 #if defined(USE_DEBUG)
-                    printf("Theshold MQ6 signal (hex): ");
-                    PrintWord(ThresholdMQ6);
-                    printf("\r\n");
+//                    printf("Theshold MQ6 signal (hex): ");
+//                    PrintWord(ThresholdMQ6);
+//                    printf("\r\n");
                 #endif
                 WSANFlags.bits.DisableGetThresMq6 = 1;
             }
@@ -1937,14 +1998,12 @@ void HardwareInit(void)
     {
         RFIF = 1;
     }
-
     /*Configure for other modules that designed by lab411*/
     // configure for led module
     #if defined(USE_LED)
         WSAN_LED_TRIS = 0;
         WSAN_LED = CLEAR;//Clear Led to a initialize state
     #endif
-    
     // configure for ADC module
         //config for pin
     #if defined(USE_WARNING_LOW_POWER) || defined(USE_MQ6_V1)
@@ -1996,7 +2055,9 @@ void HardwareInit(void)
         SCK_TRIS    =   CLEAR;
         DATA_TRIS   =   CLEAR;
     #endif
+    
 
+      
     // check Miniradar if it connect with this board target
     #ifdef USE_MINI_RADAR
         if(CheckMiniRadar())
@@ -2014,7 +2075,6 @@ void HardwareInit(void)
             #endif
         }
     #endif
-
     // configure interface to connect with PIR
     #if defined(USE_PIR) || defined(USE_MQ6_V2)
 
@@ -2152,10 +2212,10 @@ void _ISR __attribute__((interrupt, auto_psv)) _ADC1Interrupt(void)
                 }
                 else
                 {
-                    #if defined(USE_DEBUG)
-                        ConsolePut(k+0x30);
-                        printf("\r\n");
-                    #endif
+//                    #if defined(USE_DEBUG)
+//                        ConsolePut(k+0x30);
+//                        printf("\r\n");
+//                    #endif
                     --k;
                     Mq6Signal = Mq6Signal + MQ6_BUFF;//lay gia tri dien ap tu mq6
                     AD1CON1bits.SAMP = SET;
@@ -2205,29 +2265,21 @@ void _ISR __attribute__((interrupt, auto_psv)) _U2RXInterrupt(void)
         WSANFlags.bits.ActorAckReceive = SET;
 }
 #endif
-#if defined(USE_DEBUG)&& defined(USE_PTC06)
+//******************** Interrupt sevice rotuine for I2C1 Master ***************************
+void __attribute__((interrupt,no_auto_psv)) _MI2C1Interrupt(void)
+{
+  IFS1bits.MI2C1IF = 0;							//Clear Interrupt status of I2C1		
+}
+#if defined(USE_DEBUG)|| defined(USE_PTC06) //nxt fix &&->||
 void _ISR __attribute__((interrupt, auto_psv)) _U1RXInterrupt(void)
 {
     IFS0bits.U1RXIF = CLEAR;
     data = U1RXREG;
-    if(data=='a'){
-        Take_photo();
-        UART1PutROMString("end");
-               }
-    if(data=='b'){
-        //UART1PrintWord(length_data);
-       for(j=0;j<length_data;j++){
-        UART1PrintChar(buffer[j]);
+    if(data=='t'){
+        //WORD value=getMax44009();
+       // PrintWord(value);
         CLRWDT();
-            }
-    }
-    if(data=='c'){
-        //UART1PrintWord(length_data);
-       for(j=0;j<length_data;j++){
-        UART1Put(buffer[j]);
-        CLRWDT();
-            }        
-    }
+            }         
 }
 #endif
 #if defined (USE_MINI_RADAR)
@@ -2259,6 +2311,8 @@ void _ISR __attribute__((interrupt, auto_psv)) _U1RXInterrupt(void)
     }
 }
 #endif
+
+
 
 #if defined(USE_PIR)
 void _ISR __attribute__((interrupt, auto_psv)) _INT0Interrupt(void)
@@ -2558,6 +2612,8 @@ void Send_HTE_ToRouterEmboard(WORD HTE_Cluster)
     currentPrimitive = APSDE_DATA_request;
 }
 
+
+
 //15/11/2016:
 void Send_HTE(WORD HTE_Cluster, BYTE MSB, BYTE LSB)
 {
@@ -2676,7 +2732,7 @@ void SendOneByte(BYTE data, WORD ClusterID)
 }
 
 //25/11/2016:
-void SendByte(BYTE data, WORD ClusterID, BYTE MSB, BYTE LSB)
+ void SendByte(BYTE data, WORD ClusterID, BYTE MSB, BYTE LSB)
 {
     TxBuffer[TxData++] = MAC_LONG_ADDR_BYTE0;
     TxBuffer[TxData++] = data;
@@ -2823,7 +2879,36 @@ void AnalyzeStatus(BYTE status)
     PTC06_STATUS = (status>>1) & 0x01;
     CYCLE_SENDING_STATUS = (status>>2) & 0x01;
 }
-
+void Remote_relay(BYTE cmd){
+    switch(cmd&0x0F){
+        case 1:{//ON Pompe
+            printf("RM:001");
+            relay_Status=relay_Status|0x01;
+            break;
+        }
+        case 2:{ //OFF Pompe
+            printf("RM:002");
+            relay_Status=relay_Status&0xFE;
+            break;
+        }
+        case 3:{ //ON LIGHT
+            printf("RM:003");
+            relay_Status=relay_Status|0x02;
+            break;
+        }
+        case 4:{//OFF LIGHT
+            printf("RM:004");
+            relay_Status=relay_Status&0xFD;
+            break;
+        }       
+        default:
+            break;
+    }
+}
+//BYTE RemoteStatus(){
+//    //BYTE status=0;
+//    
+//}
 BYTE AggregateStatus()
 {
     BYTE status = 0;
@@ -2884,3 +2969,57 @@ void MCUWake(void)
  //0 DSWAKEbits.DSMCLR =0;  //BIT SU KIEN CUA MCLR
   // RCON2bits.VBAT
 }
+#if defined(USE_MAX44009)
+void getMax44009(){
+        BYTE v03=0;
+        BYTE v04=0;
+        v03= I2C1_iRead8(0x4A,0x03);
+        DelayMs(200);
+        v04= I2C1_iRead8(0x4A,0x04);
+        DelayMs(200);
+        valueMax44009=(v03<<8)+v04;
+}
+#endif
+
+#if defined(USE_Max44009)
+void Send_Max_ToRouterEmboard(WORD MAX_Cluster)
+{  
+    //cau truc ban tin du lieu dinh ki nhu sau:
+    //D1D2D3D4D5D6D7D8EE
+    //gui du lieu nhiet do - do am - nang luong chua qua xu ly
+    
+    TxBuffer[TxData++] = MAC_LONG_ADDR_BYTE0;
+    TxBuffer[TxData++] = (BYTE) (valueMax44009 >> 8);
+    TxBuffer[TxData++] = (BYTE) (valueMax44009);
+
+       
+    params.APSDE_DATA_request.DstAddrMode = APS_ADDRESS_16_BIT;//0x02 : Ban tin Unicast, Set che do dia chi mang ( DstAddress) 16 bit va yeu cau co' DstEndPoint
+    params.APSDE_DATA_request.DstAddress.ShortAddr.v[1] = RouterEmboardAddrMSB;
+    params.APSDE_DATA_request.DstAddress.ShortAddr.v[0] = RouterEmboardAddrLSB;
+
+    params.APSDE_DATA_request.SrcEndpoint = WSAN_Endpoint;
+    params.APSDE_DATA_request.DstEndpoint = WSAN_Endpoint;
+    params.APSDE_DATA_request.ProfileId.Val = MY_PROFILE_ID;
+
+    //params.APSDE_DATA_request.asduLength; TxData
+    params.APSDE_DATA_request.RadiusCounter = DEFAULT_RADIUS;//gioi han so hop ma du lieu duoc phep truyen qua, o day la 10 hop
+
+//    params.APSDE_DATA_request.DiscoverRoute = ROUTE_DISCOVERY_FORCE;
+//    params.APSDE_DATA_request.DiscoverRoute = ROUTE_DISCOVERY_SUPPRESS;
+    params.APSDE_DATA_request.DiscoverRoute = ROUTE_DISCOVERY_ENABLE;
+
+    #ifdef I_SUPPORT_SECURITY
+        params.APSDE_DATA_request.TxOptions.Val = SET;
+    #else
+        params.APSDE_DATA_request.TxOptions.Val = CLEAR;//khong ho tro bao mat
+    #endif
+    params.APSDE_DATA_request.TxOptions.bits.acknowledged = SET;// Yeu cau ACK tu thiet bi thu
+    params.APSDE_DATA_request.ClusterId.Val = MAX_Cluster;
+
+    ZigBeeBlockTx();//goi ham nay de ZigbeeIsReady() --> false
+    currentPrimitive = APSDE_DATA_request;
+}
+#endif
+
+
+

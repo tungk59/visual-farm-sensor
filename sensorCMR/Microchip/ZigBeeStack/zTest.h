@@ -173,6 +173,12 @@ for each device.
 #define NONE_SUPPORT                                0x0025
 //Reset
 #define RESET_NODE                                  0x0026
+//max44009
+#define MAX_REQUEST_CLUSTER                         0x0027
+#define MAX_RESPONSE_CLUSTER                        0x0028
+#define RELAY_FUNCTION                              0x001B
+#define RELAY_RESPONSE                              0x001D
+
 //******************************************************************************
 // Mandatory Clusters
 

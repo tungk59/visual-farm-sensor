@@ -107,6 +107,7 @@ void PrintChar(BYTE);
 void PrintWord(WORD);//programming by dat_a3cbq91
 //</test code>
 #define printf(x)	UART1PutROMString((ROM char *)x)
+//#define printf2(x)  ConsolePutROMString((ROM char *)x)
 
 #endif
 

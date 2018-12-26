@@ -91,7 +91,6 @@
     void ConsolePutROMString(ROM char* str)
     {
         BYTE c;
-
         while( (c = *str++) != 0 )
         ConsolePut(c);
     }

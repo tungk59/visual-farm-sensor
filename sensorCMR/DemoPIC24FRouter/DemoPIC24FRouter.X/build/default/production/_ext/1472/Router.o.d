@@ -24,6 +24,7 @@ build/default/production/_ext/1472/Router.o:  \
 ../../microchip/ZigBeeStack/zMAC_MRF24J40.h  \
 ../../microchip/ZigBeeStack/zNVM.h  \
 ../../microchip/ZigBeeStack/zPHY_MRF24J40.h  \
+../../microchip/Common/i2c_t.h  \
 ../../microchip/Common/console.h  \
 ../../microchip/Common/delay.h  \
 ../../microchip/Common/SHT1x.h  \
